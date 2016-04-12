@@ -9,8 +9,12 @@ var mainState = (function (_super) {
     __extends(mainState, _super);
     function mainState() {
         _super.apply(this, arguments);
-        this.velocidad = 2000;
-        this.aceleracion = 1500;
+        this.bolaEnBarra = true;
+        this.scoreText = Phaser.Text;
+        this.score = 0;
+        this.livesText = Phaser.Text;
+        this.lives = 3;
+        this.textoInicio = Phaser.Text;
     }
     mainState.prototype.preload = function () {
         _super.prototype.preload.call(this);
@@ -61,13 +65,15 @@ var mainState = (function (_super) {
         this.physics.enable(this.barra, Phaser.Physics.ARCADE);
         this.barra.body.collideWorldBounds = true;
         this.barra.body.bounce.set(0.0);
+        this.barra.body.immovable = true;
     };
     mainState.prototype.createBola = function () {
-        this.bola = this.add.sprite(this.world.centerX, 527, 'bola');
+        this.bola = this.add.sprite(this.world.centerX, this.barra.y - 23, 'bola');
         this.bola.anchor.setTo(0.5, 0.5);
         this.physics.enable(this.bola, Phaser.Physics.ARCADE);
         this.bola.body.collideWorldBounds = true;
-        this.bola.body.bounce.set(0.7);
+        this.bola.body.bounce.set(1);
+        this.bola.checkWorldBounds = true;
         this.bola.events.onOutOfBounds.add(this.ballLost, this);
     };
     mainState.prototype.create = function () {
@@ -78,17 +84,74 @@ var mainState = (function (_super) {
         this.createBricks();
         this.createBarra();
         this.createBola();
+        this.game.input.onTap.addOnce(this.primeraBola, this);
+        this.textoInicio = this.game.add.text(200, 275, 'clic para empezar!', { font: "70px Arial", fill: "#ffffff", align: 'center' });
+        this.scoreText = this.game.add.text(32, 550, 'puntuación: 0', { font: "20px Arial", fill: "#ffffff", align: "left" });
+        this.livesText = this.game.add.text(850, 550, 'vidas: 3', { font: "20px Arial", fill: "#ffffff", align: "left" });
     };
     mainState.prototype.update = function () {
         this.barra.x = this.game.input.x;
-        this.game.physics.arcade.collide(this.bola, this.bricks, this.onBrickTouched, null, this);
+        if (this.bolaEnBarra) {
+            this.bola.body.x = this.barra.x;
+        }
+        else {
+            this.game.physics.arcade.collide(this.bola, this.bricks, this.bolaTocaBrick, null, this);
+            this.game.physics.arcade.collide(this.bola, this.barra, this.bolaTocaBarra, null, this);
+        }
     };
-    mainState.prototype.onBrickTouched = function (bola, brick) {
+    mainState.prototype.bolaTocaBarra = function (bola, barra) {
+        var aux = 0;
+        if (this.bola.x < this.barra.x) {
+            //bola en la izquierda de la barra
+            aux = this.barra.x - this.bola.x;
+            this.bola.body.velocity.x = (-10 * aux);
+        }
+        else if (this.bola.x > this.barra.x) {
+            //bola en la derecha de la barra
+            aux = this.bola.x - this.barra.x;
+            this.bola.body.velocity.x = (10 * aux);
+        }
+        else {
+            this.bola.body.velocity.x = 2 + Math.random() * 8;
+        }
+    };
+    mainState.prototype.bolaTocaBrick = function (bola, brick) {
         brick.kill();
-        this.bola.body.acceleration.x = this.bola.body.acceleration.x + 8;
+        this.score += 10;
+        this.scoreText.setText('puntuación: ' + this.score);
         this.bola.body.acceleration.y = this.bola.body.acceleration.y + 8;
     };
     mainState.prototype.ballLost = function () {
+        if (this.lives > 1) {
+            this.lives -= 1;
+            this.livesText.setText('vidas: ' + this.lives);
+            this.bolaEnBarra = true;
+            this.bola.reset(this.world.centerX, this.barra.y - 23);
+            this.game.input.onTap.addOnce(this.primeraBola, this);
+        }
+        else {
+            this.gameOver();
+        }
+    };
+    mainState.prototype.gameOver = function () {
+        this.livesText.setText('vidas: 0');
+        this.textoInicio.setText('palmaste!');
+        this.textoInicio.visible = true;
+        this.game.input.onTap.addOnce(this.restart, this);
+    };
+    mainState.prototype.restart = function () {
+        this.bolaEnBarra = true;
+        this.score = 0;
+        this.lives = 3;
+        this.game.state.restart();
+    };
+    mainState.prototype.primeraBola = function () {
+        if (this.bolaEnBarra) {
+            this.textoInicio.visible = false;
+            this.bolaEnBarra = false;
+            this.bola.body.velocity.y = -300;
+            this.bola.body.velocity.x = -300;
+        }
     };
     return mainState;
 })(Phaser.State);

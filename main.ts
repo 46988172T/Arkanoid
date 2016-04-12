@@ -1,13 +1,19 @@
 /// <reference path="phaser/phaser.d.ts"/>
 import Point = Phaser.Point;
+
 class mainState extends Phaser.State {
 
     private cursor:Phaser.CursorKeys;
     private barra:Phaser.Sprite;
     private bola:Phaser.Sprite;
-    private velocidad = 2000;
-    private aceleracion = 1500;
     private bricks:Phaser.Group;
+    private bolaEnBarra = true;
+
+    private scoreText = Phaser.Text;
+    private score = 0;
+    private livesText = Phaser.Text;
+    private lives = 3;
+    private textoInicio = Phaser.Text;
 
     preload():void {
         super.preload();
@@ -66,20 +72,21 @@ class mainState extends Phaser.State {
         this.barra = this.add.sprite(this.world.centerX, 550, 'barra');
         this.barra.anchor.setTo(0.5, 0.5);
 
-
         this.physics.enable(this.barra, Phaser.Physics.ARCADE);
         this.barra.body.collideWorldBounds = true;
         this.barra.body.bounce.set(0.0);
+        this.barra.body.immovable = true;
+
     }
 
     createBola(){
-        this.bola = this.add.sprite(this.world.centerX, 527, 'bola');
+        this.bola = this.add.sprite(this.world.centerX, this.barra.y-23, 'bola');
         this.bola.anchor.setTo(0.5, 0.5);
-
 
         this.physics.enable(this.bola, Phaser.Physics.ARCADE);
         this.bola.body.collideWorldBounds = true;
-        this.bola.body.bounce.set(0.7);
+        this.bola.body.bounce.set(1);
+        this.bola.checkWorldBounds = true;
         this.bola.events.onOutOfBounds.add(this.ballLost, this);
     }
 
@@ -92,25 +99,85 @@ class mainState extends Phaser.State {
         this.createBricks();
         this.createBarra();
         this.createBola();
+        this.game.input.onTap.addOnce(this.primeraBola,this);
+
+
+        this.textoInicio = this.game.add.text(200, 275,  'clic para empezar!', { font: "70px Arial", fill: "#ffffff", align: 'center'});
+        this.scoreText = this.game.add.text(32, 550, 'puntuación: 0', { font: "20px Arial", fill: "#ffffff", align: "left" });
+        this.livesText = this.game.add.text(850, 550, 'vidas: 3', { font: "20px Arial", fill: "#ffffff", align: "left" });
+
     }
 
     update():void {
 
         this.barra.x = this.game.input.x;
-        this.game.physics.arcade.collide(this.bola, this.bricks, this.onBrickTouched, null, this);
+
+        if (this.bolaEnBarra) {
+            this.bola.body.x = this.barra.x;
+        }else{
+            this.game.physics.arcade.collide(this.bola, this.bricks, this.bolaTocaBrick, null, this);
+            this.game.physics.arcade.collide(this.bola, this.barra, this.bolaTocaBarra, null, this);
+        }
 
     }
 
+    bolaTocaBarra(bola:Phaser.Sprite, barra:Phaser.Sprite){
+        var aux = 0;
 
+        if (this.bola.x < this.barra.x){
+            //bola en la izquierda de la barra
+            aux = this.barra.x - this.bola.x;
+            this.bola.body.velocity.x = (-10 * aux);
+        }else if(this.bola.x > this.barra.x){
+            //bola en la derecha de la barra
+            aux = this.bola.x -this.barra.x;
+            this.bola.body.velocity.x = (10 * aux);
+        }else{
+            this.bola.body.velocity.x = 2 + Math.random() * 8;
+        }
+    }
 
-    onBrickTouched(bola:Phaser.Sprite, brick:Phaser.Sprite){
+    bolaTocaBrick(bola:Phaser.Sprite, brick:Phaser.Sprite){
         brick.kill();
-        this.bola.body.acceleration.x = this.bola.body.acceleration.x + 8;
+        this.score += 10;
+        this.scoreText.setText('puntuación: '+this.score);
         this.bola.body.acceleration.y = this.bola.body.acceleration.y + 8;
     }
 
     ballLost(){
 
+        if (this.lives > 1){
+            this.lives -= 1;
+            this.livesText.setText('vidas: '+this.lives);
+            this.bolaEnBarra = true;
+            this.bola.reset(this.world.centerX, this.barra.y-23);
+            this.game.input.onTap.addOnce(this.primeraBola,this);
+        }else{
+            this.gameOver();
+        }
+    }
+
+    gameOver(){
+        this.livesText.setText('vidas: 0');
+        this.textoInicio.setText('palmaste!');
+        this.textoInicio.visible = true;
+        this.game.input.onTap.addOnce(this.restart,this);
+    }
+
+    restart(){
+        this.bolaEnBarra = true;
+        this.score = 0;
+        this.lives = 3;
+        this.game.state.restart();
+    }
+
+    primeraBola(){
+        if (this.bolaEnBarra){
+            this.textoInicio.visible = false;
+            this.bolaEnBarra = false;
+            this.bola.body.velocity.y = -300;
+            this.bola.body.velocity.x = -300;
+        }
     }
 }
 
